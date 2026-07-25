@@ -728,7 +728,7 @@ if st.session_state.stage in ["hint", "pseudocode", "code", "solved", "ingesting
                         col_ind1, col_ind2 = st.columns(2)
                         with col_ind1:
                             if st.button("✅ Solved?", use_container_width=True):
-                                with st.spinner("Generating optimal reference code for comparison..."):
+                                with st.spinner("Preparing an example solution for comparison..."):
                                     if not st.session_state.code:
                                         st.session_state.code = generate_hint(st.session_state.problem_statement, st.session_state.results, stage="code")
                                 st.session_state.stage = "solved"
@@ -742,7 +742,7 @@ if st.session_state.stage in ["hint", "pseudocode", "code", "solved", "ingesting
             else:
                 st.markdown("<div class='section-header'><span class='section-header-icon'>💡</span><span class='section-header-text'>Stage 1: Hint</span></div>", unsafe_allow_html=True)
                 if st.session_state.coach_data is None:
-                    with st.spinner("Generating coaching guidance..."):
+                    with st.spinner("Thinking of some helpful tips..."):
                         coach_resp = generate_reasoning_coach(st.session_state.problem_statement, st.session_state.results[:3])
                         st.session_state.coach_data = coach_resp
                         update_history()
@@ -781,7 +781,7 @@ if st.session_state.stage in ["hint", "pseudocode", "code", "solved", "ingesting
                     st.rerun()
             with col2:
                 if st.button("🤔 No, show pseudocode"):
-                    with st.spinner("Analyzing optimal approach to generate pseudocode..."):
+                    with st.spinner("Writing a step-by-step plan for you..."):
                         if not st.session_state.code:
                             st.session_state.code = generate_hint(st.session_state.problem_statement, st.session_state.results, stage="code")
                         st.session_state.pseudocode = generate_hint(
@@ -840,8 +840,8 @@ if st.session_state.stage in ["hint", "pseudocode", "code", "solved", "ingesting
                 st.session_state.balloons_shown = True
             with st.container():
                 st.markdown("### 🎉 Awesome job!")
-                st.markdown("Would you like to ingest your new solution into the database so Deja can learn from it?")
-                if st.button("📥 Yes, let's ingest it!"):
+                st.markdown("Would you like to save your new solution into the database so Deja can learn from it?")
+                if st.button("📥 Yes, let's save it!"):
                     st.session_state.stage = "ingesting"
                     update_history()
                     st.rerun()
@@ -851,21 +851,21 @@ if st.session_state.stage in ["hint", "pseudocode", "code", "solved", "ingesting
             
     if st.session_state.stage == "ingesting":
         with st.container():
-            st.markdown("### 📥 Ingest New Solution")
+            st.markdown("### 📥 Save a New Solution")
             
-            title_slug = st.text_input("Problem Title Slug (e.g., 'two-sum'):")
+            title_slug = st.text_input("Problem Title (e.g., 'Two Sum'):")
             solution_code = st.text_area("Paste your accepted Python code here:", height=250)
             
-            if st.button("🚀 Save & Ingest"):
+            if st.button("🚀 Save Solution"):
                 if not title_slug or not solution_code:
-                    st.error("Please provide both a title slug and your solution code.")
+                    st.error("Please provide both a problem title and your solution code.")
                 else:
-                    with st.spinner("Analyzing and updating vectorstore (this takes ~5s)..."):
+                    with st.spinner("Processing your solution (this takes ~5s)..."):
                         res = run_ingestion(st.session_state.problem_statement, title_slug, solution_code)
                         if res and res.get("status") == "success":
-                            st.success("✅ Ingestion successful! Your solution is now searchable.")
+                            st.success("✅ Saved successfully! Your solution is now searchable.")
                             # Send the user back to the home screen to tackle their next challenge
                             st.session_state.stage = "welcome"
                             update_history()
                         else:
-                            st.error(f"❌ Ingestion failed: {res.get('message') if res else 'Unknown error'}")
+                            st.error(f"❌ Failed to save: {res.get('message') if res else 'Unknown error'}")
