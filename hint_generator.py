@@ -248,21 +248,3 @@ def generate_reasoning_coach(problem_statement: str, closest_results: list[dict]
                 return {"error": f"An unexpected error occurred: {e}"}
 
     return {"error": "Failed to generate coach response after exhausting retries."}
-
-
-if __name__ == "__main__":
-    from retrieve import retrieve_similar_problems
-    
-    # Test the script with a known query to ensure the LLMs are responding correctly
-    test_problem = "find the kth largest element in an unsorted array."
-    
-    print("Testing retrieval gating and hint generation...")
-    results = retrieve_similar_problems(test_problem, top_k_retrieve=15, top_k_final=5)
-    
-    if not results:
-        print("\n--- GATED RESULT ---")
-        print(generate_hint(test_problem, results, stage="hint"))
-    else:
-        print(f"\n--- HINT FOR '{test_problem[:50]}...' ---")
-        hint = generate_hint(test_problem, results, stage="hint")
-        print(hint)

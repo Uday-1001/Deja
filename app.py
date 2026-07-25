@@ -357,6 +357,22 @@ def save_history(history):
     with open(HISTORY_FILE, "w") as f:
         json.dump(history, f, indent=2)
 
+def get_relevant_matches(results: list[dict], score_margin: float = 0.35, min_matches: int = 1, max_matches: int = 5) -> list[dict]:
+    """
+    Return a dynamic subset of results scoring within `score_margin` of the top result,
+    bounded between `min_matches` and `max_matches`.
+    """
+    if not results:
+        return []
+    top_score = results[0].get("similarity_score", 0.0)
+    relevant = [
+        r for r in results[:max_matches]
+        if (top_score - r.get("similarity_score", 0.0)) <= score_margin
+    ]
+    if len(relevant) < min_matches:
+        relevant = results[:min_matches]
+    return relevant
+
 def init_state():
     if "session_id" not in st.session_state:
         st.session_state.session_id = str(uuid.uuid4())
@@ -667,15 +683,16 @@ if st.session_state.stage in ["hint", "pseudocode", "code", "solved", "ingesting
         if st.session_state.is_confident:
             st.markdown("<div class='section-header'><span class='section-header-icon'>💡</span><span class='section-header-text'>Stage 1: Hint</span></div>", unsafe_allow_html=True)
             if st.session_state.results:
-                st.markdown("##### 📚 Based on your past solved problems:")
                 past_problems_md = ""
-                for res in st.session_state.results[:3]:
+                relevant_matches = get_relevant_matches(st.session_state.results)
+                for res in relevant_matches:
                     title = res.get('title', res.get('title_slug', 'Unknown Problem'))
                     diff = res.get('difficulty', 'Unknown')
                     tech = res.get('core_technique', '')
                     tech_str = f" - *{tech}*" if tech else ""
                     past_problems_md += f"- **{title}** ({diff}){tech_str}\n"
-                st.info(past_problems_md)
+                with st.expander("📚 Based on your past solved problems", expanded=False):
+                    st.info(past_problems_md)
                 
             st.info(st.session_state.hint)
         else:
@@ -683,7 +700,8 @@ if st.session_state.stage in ["hint", "pseudocode", "code", "solved", "ingesting
             st.markdown("I found a few somewhat related problems, but none closely matches this one.")
             if st.session_state.results:
                 past_problems_md = ""
-                for res in st.session_state.results[:3]:
+                relevant_matches = get_relevant_matches(st.session_state.results)
+                for res in relevant_matches:
                     title = res.get('title', res.get('title_slug', 'Unknown Problem'))
                     diff = res.get('difficulty', 'Unknown')
                     tech = res.get('core_technique', '')

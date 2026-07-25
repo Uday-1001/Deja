@@ -15,7 +15,7 @@ from langchain_huggingface import HuggingFaceEmbeddings
 # pyrefly: ignore [missing-import]
 from langchain_community.cross_encoders import HuggingFaceCrossEncoder
 
-CONFIDENCE_THRESHOLD = 0.3
+
 
 
 # Keep our heavy AI models in memory so they only load once per session
@@ -56,23 +56,40 @@ def retrieve_similar_problems(
     query_text: str,
     top_k_retrieve: int = 15,
     top_k_final: int = 5,
+    dense_weight: float = 0.6,
 ) -> tuple[list[dict], bool]:
     """
-    Retrieve semantically similar problems using FAISS dense similarity,
-    followed by cross-encoder reranking.
+    Retrieve semantically similar problems using FAISS dense similarity blended with cross-encoder reranking.
     Returns (results, is_confident).
     """
     if vectorstore is None or cross_encoder is None or records_dict is None:
         init_models()
-        
-    # Cast a wide net first: find the top 15 problems using fast dense vector matching
-    base_docs = vectorstore.similarity_search(query_text, k=top_k_retrieve)
 
-    # Zoom in for precision: use the cross-encoder to strictly score and rank the top 5 matches
+    # Get dense results WITH distance scores
+    base_docs_with_dist = vectorstore.similarity_search_with_score(query_text, k=top_k_retrieve)
+    base_docs = [doc for doc, _ in base_docs_with_dist]
+    dense_distances = [dist for _, dist in base_docs_with_dist]
+
+    # Normalize FAISS distance (lower = better) into similarity (higher = better), 0 to 1
+    max_dist = max(dense_distances) if dense_distances else 1.0
+    min_dist = min(dense_distances) if dense_distances else 0.0
+    dist_range = max(max_dist - min_dist, 1e-6)
+    dense_scores_norm = [1 - ((d - min_dist) / dist_range) for d in dense_distances]
+
+    # Cross-encoder scores, normalized the same way (min-max within this batch)
     pairs = [[query_text, doc.page_content] for doc in base_docs]
-    scores = cross_encoder.score(pairs)
-    
-    docs_with_scores = list(zip(base_docs, scores))
+    ce_scores = cross_encoder.score(pairs)
+    max_ce, min_ce = max(ce_scores), min(ce_scores)
+    ce_range = max(max_ce - min_ce, 1e-6)
+    ce_scores_norm = [(s - min_ce) / ce_range for s in ce_scores]
+
+    # Blend: weighted combination instead of pure cross-encoder ranking
+    blended = [
+        dense_weight * d + (1 - dense_weight) * c
+        for d, c in zip(dense_scores_norm, ce_scores_norm)
+    ]
+
+    docs_with_scores = list(zip(base_docs, blended))
     docs_with_scores.sort(key=lambda x: x[1], reverse=True)
 
     results = []
@@ -83,9 +100,9 @@ def retrieve_similar_problems(
             full_record["similarity_score"] = round(float(score), 4)
             results.append(full_record)
 
-    is_confident = True
-    if not results or results[0].get("similarity_score", 0.0) < CONFIDENCE_THRESHOLD:
-        is_confident = False
+    # Blended score is now genuinely bounded 0-1 by construction (min-max normalized),
+    # unlike the old raw unbounded cross-encoder logit — threshold is meaningful now.
+    is_confident = bool(results) and results[0]["similarity_score"] > 0.55
 
     return results, is_confident
 

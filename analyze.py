@@ -127,14 +127,9 @@ def _word_count(s: str) -> int:
 
 
 def validate_analysis(data: dict):
-    """Return (is_valid, reason) with detailed per-check validation.
-
-    Checks (in order):
-      1. Every required field exists and is a non-empty string.
-      2. No field contains a placeholder / vague value.
-      3. pattern_family exactly matches the allowed taxonomy.
-      4. time_complexity and space_complexity match Big-O notation.
-      5. Minimum word-count requirements per field.
+    """
+    Return (is_valid, reason) after verifying required fields, pattern taxonomy,
+    Big-O formatting, and minimum word-count constraints.
     """
     # Validate that every required field actually exists and isn't empty
     for field in REQUIRED_FIELDS:
