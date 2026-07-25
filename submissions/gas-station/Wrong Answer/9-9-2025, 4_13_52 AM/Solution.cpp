@@ -1,0 +1,24 @@
+// https://leetcode.com/problems/gas-station
+
+class Solution {
+public:
+    int canCompleteCircuit(vector<int>& gas, vector<int>& cost) {
+        int deficit = 0;
+        int extra_gas = 0;
+        int start = 0;
+
+        for(int i=0 ; i<gas.size() ; i++)
+        {
+            if(gas[i] < cost[i])
+            {
+                deficit += abs(gas[i] - cost[i]);
+                start = i+1;
+            }
+            else
+            {
+                extra_gas += abs(gas[i] - cost[i]);
+            }
+        }
+    return (extra_gas - deficit >= 0) ? start : -1;
+    }
+};

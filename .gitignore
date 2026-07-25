@@ -1,0 +1,33 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+venv/
+env/
+ENV/
+
+# Secrets and environment variables
+.env
+.env.local
+
+# Generated Vector Database (FAISS)
+# (These are binary files generated from analyzed_problems.json)
+faiss_index/
+
+# Application Specific Scratch / Temp files
+scratch.py
+solution.py
+Details Deepdive/
+
+# OS / IDE specific files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Personal Data
+history.json
+problems.json
+analyzed_problems.json

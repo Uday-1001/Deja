@@ -1,0 +1,31 @@
+// https://leetcode.com/problems/minimum-length-of-string-after-operations
+
+class Solution {
+public:
+    int minimumLength(string s) {
+        int n = s. length();
+        int hash[26] = {0};
+        
+        for(int i =0 ; i<s.size(); i++)
+        {
+            hash[s[i]-'a']++;
+        }
+
+        int count = 0;
+        for(int i =0 ; i<26 ; i++)
+        {
+            if(hash[i] > 0)
+            {
+                if(hash[i] & 1)
+                {
+                  count += 1;
+                }
+                else
+                {
+                  count += 2;
+                } 
+            }  
+        }
+        return count ;
+    }
+};

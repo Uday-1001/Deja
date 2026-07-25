@@ -1,0 +1,36 @@
+// https://leetcode.com/problems/right-triangles
+
+class Solution {
+public:
+    long long numberOfRightTriangles(vector<vector<int>>& grid) {
+        int n = grid.size();
+        int m = grid[0].size();
+
+        vector<int>rows(n , 0) , cols(m , 0);
+
+        for(int i = 0 ; i<n ; i++)
+        {
+            for(int j = 0 ; j<m; j++)
+            {
+                if(grid[i][j] == 1)
+                {
+                    rows[i]++;
+                    cols[j]++;
+                }
+            }
+        }
+
+        long long ans = 0;
+        for(int i = 0 ; i<n ; i++)
+        {
+            for(int j = 0 ; j<m; j++)
+            {
+                if(grid[i][j] == 1)
+                {
+                    ans += (rows[i] - 1) * (cols[j] - 1);
+                }
+            }
+        }
+        return ans;
+    }
+};
