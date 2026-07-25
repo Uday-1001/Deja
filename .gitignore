@@ -31,3 +31,7 @@ Thumbs.db
 history.json
 problems.json
 analyzed_problems.json
+
+# Caches and Submissions Downloaded Data
+submissions/
+statement_cache/
