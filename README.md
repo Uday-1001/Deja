@@ -11,6 +11,29 @@ It achieves this through a pipeline of dense vector retrieval (FAISS), cross-enc
 * **Incremental Learning**: Solve a problem in the app, and instantly ingest it into the vector database so Deja can learn from it for future sessions.
 * **Premium UI**: A sleek, glassmorphic Streamlit interface designed for focus and aesthetics.
 
+## 🧠 Architecture & Flow
+
+```mermaid
+flowchart TD
+    A[New Problem Input] --> B(FAISS + Cross-Encoder Retrieval)
+    B --> C{Confident Match Found?}
+    
+    C -->|Yes| D[Standard Pedagogy Pipeline]
+    D --> D1[Stage 1: Hint based on past solution]
+    D1 --> D2[Stage 2: Pseudocode]
+    D2 --> D3[Stage 3: Reference Code]
+    
+    C -->|No| E[Fallback Pipeline]
+    E --> F{User Choice}
+    F -->|Coach Mode| G[LLM Acts as Socratic Coach]
+    F -->|Independent| H[User Solves Independently]
+    
+    D3 --> I[Solve & Ingest]
+    G --> I
+    H --> I
+    I --> J[(Vector Database Updated)]
+```
+
 ---
 
 ## 🛠️ Getting Started
