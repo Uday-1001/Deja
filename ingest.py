@@ -34,10 +34,7 @@ def run_ingestion(problem_statement: str, title_slug: str = None, code: str = No
         "title": title_slug,
         "title_slug": title_slug,
         "problem_statement": problem_statement,
-        "lang": "python3",
-        "my_solution_code": code,
-        "difficulty": "Unknown",
-        "topics_tagged": []
+        "my_solution_code": code
     }
     
     # Give the API a few chances to respond if we hit a rate limit wall

@@ -24,6 +24,7 @@ hint_model = ChatOpenAI(
     api_key=GROQ_API_KEY,
     base_url="https://api.groq.com/openai/v1",
     temperature=0.3,
+    max_tokens=2048,
 )
 
 code_model = ChatOpenAI(
@@ -31,6 +32,7 @@ code_model = ChatOpenAI(
     api_key=GROQ_API_KEY,
     base_url="https://api.groq.com/openai/v1",
     temperature=0.2,
+    max_tokens=4096,
 )
 
 # The specific instructions we feed the LLMs to keep them on track

@@ -57,18 +57,19 @@ PROMPT_TEMPLATE = """You are analyzing a competitive programming solution to ext
 
 INPUT:
 Problem Title: {title}
-Difficulty: {difficulty}
-Official Topic Tags: {topics_tagged}
 Problem Statement: {problem_statement}
-Accepted Solution Code ({lang}):
+Accepted Solution Code:
 {my_solution_code}
 
 TASK:
-Analyze the problem statement and the accepted solution together. Identify the core algorithmic technique actually used in the code (not just the official topic tags), the key insight that makes this technique applicable, and the complexity.
+Analyze the problem statement and the accepted solution together. Identify the core algorithmic technique actually used in the code, the key insight that makes this technique applicable, the complexity, the programming language of the code, the estimated difficulty, and the relevant topic tags.
 
 Return ONLY valid JSON with exactly these fields, and nothing else — no markdown code fences, no explanation before or after:
 
 {{
+  "lang": "The programming language of the solution code (e.g., 'python', 'cpp', 'java', 'javascript', etc.)",
+  "difficulty": "Estimated difficulty of the problem ('Easy', 'Medium', or 'Hard')",
+  "topics_tagged": ["List", "of", "relevant", "topic", "tags", "e.g.", "Array", "Dynamic Programming"],
   "core_technique": "One specific sentence naming the exact technique/data structure/algorithm used in this code (e.g. 'Two-pointer with fixed window shrink' not just 'Array')",
   "key_insight": "One to two sentences on the non-obvious realization or observation that makes this technique work for this specific problem",
   "time_complexity": "Big-O notation, e.g. O(n log n)",
@@ -87,6 +88,8 @@ Rules:
 """
 
 REQUIRED_FIELDS = {
+    "lang",
+    "difficulty",
     "core_technique",
     "key_insight",
     "time_complexity",
@@ -147,6 +150,16 @@ def validate_analysis(data: dict):
         if _PLACEHOLDER_PATTERNS.match(val):
             return False, f"field '{field}' contains a placeholder value: '{val}'"
 
+    # Validate topics_tagged
+    topics = data.get("topics_tagged")
+    if not isinstance(topics, list) or not all(isinstance(t, str) for t in topics) or len(topics) == 0:
+        return False, "field 'topics_tagged' must be a non-empty list of strings"
+
+    # Validate difficulty
+    diff = data.get("difficulty", "").strip().lower()
+    if diff not in ["easy", "medium", "hard"]:
+        return False, f"field 'difficulty' must be Easy, Medium, or Hard (got '{data.get('difficulty')}')"
+
     # Ensure the pattern family strictly matches our defined taxonomy
     pf = data["pattern_family"].strip()
     if pf not in ALLOWED_PATTERN_FAMILIES:
@@ -175,18 +188,12 @@ def validate_analysis(data: dict):
 def analyze_problem(problem):
     # Sanitize problem inputs to prevent the template formatter from crashing
     title = problem.get("title") or ""
-    difficulty = problem.get("difficulty") or ""
-    topics_tagged = ", ".join(problem.get("topics_tagged") or [])
     problem_statement = problem.get("problem_statement") or ""
-    lang = problem.get("lang") or ""
     my_solution_code = (problem.get("my_solution_code") or "")[:MAX_CODE_CHARS]
 
     prompt = PROMPT_TEMPLATE.format(
         title=title,
-        difficulty=difficulty,
-        topics_tagged=topics_tagged,
         problem_statement=problem_statement,
-        lang=lang,
         my_solution_code=my_solution_code,
         pattern_families=PATTERN_FAMILIES,
     )
