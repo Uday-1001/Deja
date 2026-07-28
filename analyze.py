@@ -13,11 +13,13 @@ from openai import OpenAI, RateLimitError, APIError
 
 load_dotenv()
 
-# Windows consoles often struggle with emojis; this forces UTF-8 encoding to keep things pretty
+# Forces UTF-8 output encoding.
+# Keeps our emojis looking pretty on Windows consoles.
 if sys.stdout.encoding.lower() != 'utf-8':
     sys.stdout.reconfigure(encoding='utf-8')
 
-# Connect to Groq's blazing fast inference engine using the standard OpenAI client format
+# Boots up the API client for Groq.
+# We use this to analyze problems blazing fast.
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 if not GROQ_API_KEY:
     print("Error: GROQ_API_KEY not found in .env")
@@ -29,9 +31,11 @@ client = OpenAI(
 )
 
 MODEL = "llama-3.3-70b-versatile"
-# Groq is fast, but we still need to respect rate limits to avoid getting temporarily banned
+# Basic delay to avoid getting banned.
+# Groq is fast, but their rate limits can still bite.
 BASE_DELAY_SEC = 2.5
-# Keep the input size reasonable to avoid burning through our daily token allowance
+# Caps the amount of code we send.
+# Saves tokens and keeps the AI focused on the core logic.
 MAX_CODE_CHARS = 4000
 
 SYSTEM_PROMPT = (
@@ -99,24 +103,28 @@ REQUIRED_FIELDS = {
     "embedding_text",
 }
 
-# A strict taxonomy list to ensure the LLM categorizes problems consistently
+# A locked-down list of allowed categories.
+# Prevents the AI from hallucinating weird new algorithms!
 ALLOWED_PATTERN_FAMILIES: set[str] = {
     v.strip() for v in PATTERN_FAMILIES.split(",") if v.strip()
 }
 
-# Regex to ensure the LLM returns standard Big-O notation for time and space complexities
+# Sniffs out standard Big-O notation.
+# Ensures the AI actually tells us the time/space complexity properly.
 _COMPLEXITY_RE = re.compile(
     r"O\s*\(.*\)",
     re.IGNORECASE,
 )
 
-# Catch lazy LLM responses like 'N/A' or 'Unknown' before they get saved to the database
+# Catches lazy AI responses like "N/A" or "Unknown".
+# We block these so they don't pollute our database.
 _PLACEHOLDER_PATTERNS = re.compile(
     r"^(?:n/?a|unknown|none|not\s+applicable|generic|tbd|-)$",
     re.IGNORECASE,
 )
 
-# Force the LLM to write detailed explanations rather than one-word summaries
+# Sets a word count floor for specific fields.
+# Forces the AI to actually explain things instead of one-word answers.
 _MIN_WORDS: dict[str, int] = {
     "core_technique": 2,
     "key_insight": 10,
@@ -130,10 +138,8 @@ def _word_count(s: str) -> int:
 
 
 def validate_analysis(data: dict):
-    """
-    Return (is_valid, reason) after verifying required fields, pattern taxonomy,
-    Big-O formatting, and minimum word-count constraints.
-    """
+    # Thoroughly audits the AI's JSON output.
+    # Checks required fields, Big-O formats, and word counts so we don't save garbage.
     # Validate that every required field actually exists and isn't empty
     for field in REQUIRED_FIELDS:
         val = data.get(field)
@@ -186,7 +192,8 @@ def validate_analysis(data: dict):
     return True, None
 
 def analyze_problem(problem):
-    # Sanitize problem inputs to prevent the template formatter from crashing
+    # Scrubs the input data.
+    # Prevents string formatting from crashing if fields are None.
     title = problem.get("title") or ""
     problem_statement = problem.get("problem_statement") or ""
     my_solution_code = (problem.get("my_solution_code") or "")[:MAX_CODE_CHARS]
@@ -223,7 +230,8 @@ def analyze_problem(problem):
         return data
         
     except RateLimitError as e:
-        # If we get rate limited, check exactly how many seconds we need to wait before trying again
+        # Checks how long we need to wait after a rate limit.
+        # We cap this to 60s so the script doesn't hang forever.
         MAX_WAIT = 60.0  # Never wait more than 60s — Groq can return 1000+ second values
         retry_after = e.response.headers.get("Retry-After") if hasattr(e, 'response') and e.response is not None else None
         if retry_after:
@@ -236,7 +244,8 @@ def analyze_problem(problem):
             except ValueError:
                 pass
         
-        # Fall back to a standard 60-second delay if the API didn't tell us how long to wait
+        # Uses a default timeout if the API doesn't specify.
+        # Standard safety net for unknown 429s.
         print(f"    [RateLimit] Groq returned 429. No valid Retry-After header. e: {e}")
         return {"error": "rate_limit", "retry_after": 60.0}
         
@@ -263,7 +272,8 @@ def main():
     with open(in_path, "r", encoding="utf-8") as f:
         problems = json.load(f)
 
-    # Check if we've already done some work so we can pick up right where we left off
+    # Scans for previously analyzed problems.
+    # Lets us safely resume where we left off without repeating work!
     out_path = Path(args.output)
     analyzed_data = {}
     if out_path.exists():
@@ -278,7 +288,8 @@ def main():
     processed_this_run = 0
     run_start = time.time()
 
-    # Figure out exactly how much work is left to give the user an accurate time estimate
+    # Calculates the remaining workload.
+    # Super helpful for estimating how long the batch job will take.
     pending = [
         (i, p) for i, p in enumerate(problems)
         if p["title_slug"] not in analyzed_data or "core_technique" not in analyzed_data[p["title_slug"]]
@@ -296,7 +307,8 @@ def main():
 
         start_time = time.time()
 
-        # Keep trying if the API gets overwhelmed or returns messy data
+        # Retries the request a few times if the AI fumbles.
+        # We give it multiple chances to output valid JSON.
         rate_limit_retries = 10
         validation_retries = 2
         success = False
@@ -321,7 +333,8 @@ def main():
                     break  # non-retriable errors (APIError, etc.)
             else:
                 elapsed_req = time.time() - start_time
-                # Tag the successful result with timestamps and model info for future reference
+                # Stamps the metadata on successful results.
+                # Helps us track which model analyzed what, and when.
                 result["analysis_model"] = MODEL
                 result["analysis_version"] = 1
                 result["analysis_timestamp"] = datetime.now(timezone.utc).isoformat()
@@ -331,7 +344,8 @@ def main():
                 analyzed_data[slug] = merged
                 success = True
 
-                # Crunch the numbers to figure out when this batch job will finally finish
+                # Estimates the remaining time for the whole batch.
+                # Updates the progress bar with a live ETA.
                 processed_this_run += 1
                 elapsed_total = time.time() - run_start
                 avg_per_problem = elapsed_total / processed_this_run
@@ -344,23 +358,27 @@ def main():
                     flush=True,
                 )
 
-                # Save our progress frequently so we don't lose everything if the script crashes
+                # Checkpoints our progress every 5 problems.
+                # A lifesaver if the script crashes halfway through!
                 if processed_this_run % 5 == 0:
                     with open(out_path, "w", encoding="utf-8") as f:
                         json.dump(list(analyzed_data.values()), f, ensure_ascii=False, indent=2)
                     print(f"  ...checkpoint: {len(analyzed_data)} total problems saved")
 
         if not success:
-            # Give up gracefully if the API is completely unresponsive after multiple attempts
+            # Gives up after burning all our retries.
+            # We skip the problem rather than crashing the whole loop.
             print(f" FAIL skipped after exhausting retries", flush=True)
 
-        # Take a quick breather to keep the API servers happy and avoid getting blocked
+        # Enforces our base rate-limit delay.
+        # Keeps Groq happy so they don't block our IP.
         elapsed = time.time() - start_time
         sleep_time = max(0, BASE_DELAY_SEC - elapsed)
         if sleep_time > 0:
             time.sleep(sleep_time)
 
-    # Write the final, complete dataset to disk
+    # Flushes all final data to disk.
+    # The batch job is officially done!
     with open(out_path, "w", encoding="utf-8") as f:
         json.dump(list(analyzed_data.values()), f, ensure_ascii=False, indent=2)
 

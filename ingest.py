@@ -3,6 +3,8 @@ import json
 import time
 import subprocess
 from analyze import analyze_problem
+from build_vectorstore import build_page_content
+
 
 def run_ingestion(problem_statement: str, title_slug: str = None, code: str = None):
     print("\n================== INGESTION ==================")
@@ -37,7 +39,8 @@ def run_ingestion(problem_statement: str, title_slug: str = None, code: str = No
         "my_solution_code": code
     }
     
-    # Give the API a few chances to respond if we hit a rate limit wall
+    # Retries the API call if we hit rate limits.
+    # Ensures we don't crash just because the server is busy.
     max_retries = 3
     for attempt in range(max_retries):
         analysis = analyze_problem(problem)
@@ -51,18 +54,21 @@ def run_ingestion(problem_statement: str, title_slug: str = None, code: str = No
                 print(f"[Analysis Error] {analysis['message']}")
                 return
         
-        # Combine the AI's deep analysis with our original problem data
+        # Merges the fresh AI analysis with the base problem.
+        # This builds out a complete, searchable record.
         problem.update(analysis)
         problem["analysis_model"] = "llama-3.3-70b-versatile"
         
-        # Add this newly conquered problem to our historical knowledge base
+        # Saves the solved problem to our local JSON database.
+        # This keeps a persistent record of everything you've learned.
         print("[System] Analysis complete. Saving to analyzed_problems.json...")
         records = []
         if os.path.exists("analyzed_problems.json"):
             with open("analyzed_problems.json", "r", encoding="utf-8") as f:
                 records = json.load(f)
                 
-        # Wipe out any old analysis for this problem to keep our records fresh
+        # Removes old versions of this problem.
+        # This prevents duplicates and ensures we only keep your latest solution.
         records = [r for r in records if r.get("title_slug") != title_slug]
         records.append(problem)
         
@@ -80,7 +86,7 @@ def run_ingestion(problem_statement: str, title_slug: str = None, code: str = No
 
             embeddings = HuggingFaceEmbeddings(model_name="BAAI/bge-large-en-v1.5")
             
-            page_content = problem.get("embedding_text", "")
+            page_content = build_page_content(problem)
             metadata = {
                 k: v for k, v in problem.items() 
                 if k not in ["embedding_text", "my_solution_code"]
@@ -107,5 +113,6 @@ def run_ingestion(problem_statement: str, title_slug: str = None, code: str = No
     return {"status": "error", "message": "Failed after max retries."}
 
 if __name__ == "__main__":
-    # A quick test harness to make sure ingestion runs smoothly
+    # Simple test harness for local debugging.
+    # Runs a dummy problem through the ingestion pipeline.
     run_ingestion("This is a test problem statement.")

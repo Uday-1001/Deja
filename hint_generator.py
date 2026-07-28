@@ -18,7 +18,8 @@ if not GROQ_API_KEY:
     print("Error: GROQ_API_KEY not found in .env")
     exit(1)
 
-# Setup our smart assistants to generate hints and write code
+# Configures our two AI personas.
+# One is a lightweight model for hints, the other is a heavy model for writing full code.
 hint_model = ChatOpenAI(
     model="llama-3.3-70b-versatile",
     api_key=GROQ_API_KEY,
@@ -35,23 +36,24 @@ code_model = ChatOpenAI(
     max_tokens=4096,
 )
 
-# The specific instructions we feed the LLMs to keep them on track
+# The system prompts for our LLMs.
+# These strict rules prevent the AI from blurting out the answer too early!
 HINT_PROMPT = ChatPromptTemplate.from_messages([
-    ("system", "You are an expert competitive programming mentor helping a student solve a problem based on their past successful solutions. Your goal is to guide them toward the solution, not give it to them."),
+    ("system", "You are an expert competitive programming mentor helping a student solve a new problem. Your goal is to guide them toward the solution with well-crafted hints, without giving away the full answer."),
     ("user", """
 The student is trying to solve this new problem:
 {problem_statement}
 
-Based on semantic retrieval, the student has solved similar problems in the past using the following techniques:
-{past_patterns_context}
+(For your context: the student has solved these loosely related problems in the past, showing they might be familiar with these techniques:
+{past_patterns_context})
 
 TASK:
-1. Identify the most likely technique applicable here based on the trigger signals from the past problems.
-2. Provide exactly ONE guiding question or observation that nudges the student toward this technique. 
+1. Identify the core algorithmic technique needed for the new problem.
+2. Provide 2-3 bulleted hints or guiding questions focused ENTIRELY on the new problem's logic, constraints, and invariants.
 3. DO NOT provide any code. DO NOT provide step-by-step pseudocode.
-4. Do not just name the algorithm outright if you can avoid it — nudge them to realize it themselves based on the constraints or triggers.
-5. IMPORTANT: When referring to past problems, use their actual names provided in the context (e.g., 'Two Sum') rather than vague terms like 'Past Problem 1'.
-6. IMPORTANT: Output ONLY the actual hint or question directly! Do NOT include any meta-commentary like "Here is a guiding question:" or "Based on your past problems...".
+4. Do not just name the algorithm outright — nudge the student to realize it themselves based on the constraints.
+5. CRITICAL: DO NOT explicitly name or reference the past problems in your output. Sometimes the retrieved past problems are only loosely related, and referencing them directly confuses the student. Keep the hints strictly about the new problem.
+6. CRITICAL: Output ONLY the bulleted hints directly! Do NOT include any meta-commentary like "Here are some hints:" or "Based on your past work...".
 """)
 ])
 
@@ -148,9 +150,8 @@ def _format_code_context(records: list[dict]) -> str:
     return "\n".join(context_blocks)
 
 def generate_hint(problem_statement: str, retrieved_records: list[dict], stage: str = "hint", reference_code: str = "") -> str:
-    """
-    stage can be: 'hint', 'pseudocode', 'code'
-    """
+    # Routes the user's request to the correct LLM prompt.
+    # We dynamically switch context based on which stage (hint, pseudocode, code) they are in.
     if not retrieved_records and stage != "code":
         return (
             "I couldn't find any highly confident matches in your past solved problems. "
@@ -176,7 +177,8 @@ def generate_hint(problem_statement: str, retrieved_records: list[dict], stage: 
 
     chain = prompt | model
 
-    # Ping the API and gently back off if they ask us to slow down
+    # Fires the request to the Groq API.
+    # Includes automatic retries just in case we hit rate limits.
     retries = 3
     while retries > 0:
         try:
@@ -204,9 +206,8 @@ def generate_hint(problem_statement: str, retrieved_records: list[dict], stage: 
 
 
 def generate_reasoning_coach(problem_statement: str, closest_results: list[dict]) -> dict:
-    """
-    Generates structured reasoning coach guidance as a dictionary.
-    """
+    # Asks the AI to act as a reasoning coach.
+    # It returns a strict JSON structure full of probing questions and edge cases.
     chain = COACH_PROMPT | hint_model
 
     kwargs = {
@@ -219,7 +220,8 @@ def generate_reasoning_coach(problem_statement: str, closest_results: list[dict]
         try:
             response = chain.invoke(kwargs)
             content = response.content.strip()
-            # Clean up the LLM's messy output in case it wrapped the JSON in markdown fences
+            # Strips markdown code fences from the AI's response.
+            # Ensures we can cleanly parse the raw JSON data underneath.
             if content.startswith("```json"):
                 content = content[7:]
             if content.startswith("```"):

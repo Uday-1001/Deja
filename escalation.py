@@ -36,7 +36,8 @@ def main():
         print(generate_hint(problem_statement, results, stage="hint"))
         sys.exit(0)
         
-    # Stage 1: Give the user a gentle nudge towards the right algorithmic pattern
+    # Gently nudges the user with a high-level algorithm hint.
+    # Perfect for when you just need a little push in the right direction.
     print("\n================== STAGE 1: HINT ==================")
     print(generate_hint(problem_statement, results, stage="hint"))
     print("===================================================\n")
@@ -53,7 +54,8 @@ def main():
         else:
             print("Please answer 'y', 'n', or 'p'.")
 
-    # Stage 2: Break down the logic step-by-step without giving away the exact code
+    # Provides a structured step-by-step pseudocode breakdown.
+    # Helps you translate logic into code without spoiling the solution.
     print("\n=============== STAGE 2: PSEUDOCODE ===============")
     print(generate_hint(problem_statement, results, stage="pseudocode"))
     print("===================================================\n")
@@ -70,7 +72,8 @@ def main():
         else:
             print("Please answer 'y', 'n', or 'c'.")
             
-    # Stage 3: Reveal the optimal reference implementation for study
+    # Shows the complete, optimal Python code.
+    # Use this to study the best practices and compare against your own.
     print("\n================== STAGE 3: CODE ==================")
     print(generate_hint(problem_statement, results, stage="code"))
     print("===================================================\n")
